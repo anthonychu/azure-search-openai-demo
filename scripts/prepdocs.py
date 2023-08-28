@@ -307,6 +307,14 @@ def remove_from_index(filename):
         # It can take a few seconds for search results to reflect changes, so wait a bit
         time.sleep(2)
 
+def process_file(filename, upload_each_page = True):
+    if upload_each_page:
+        upload_blobs(filename)
+    page_map = get_document_text(filename)
+    sections = create_sections(os.path.basename(filename), page_map, use_vectors)
+    index_sections(os.path.basename(filename), sections)
+
+
 # refresh open ai token every 5 minutes
 def refresh_openai_token():
     if open_ai_token_cache[CACHE_KEY_TOKEN_TYPE] == 'azure_ad' and open_ai_token_cache[CACHE_KEY_CREATED_TIME] + 300 < time.time():
@@ -320,7 +328,7 @@ if __name__ == "__main__":
         description="Prepare documents by extracting content from PDFs, splitting content into sections, uploading to blob storage, and indexing in a search index.",
         epilog="Example: prepdocs.py '..\data\*' --storageaccount myaccount --container mycontainer --searchservice mysearch --index myindex -v"
         )
-    parser.add_argument("files", help="Files to be processed")
+    parser.add_argument("--files", required=False, help="Local files to be processed")
     parser.add_argument("--category", help="Value for the category field in the search index for all sections indexed in this run")
     parser.add_argument("--skipblobs", action="store_true", help="Skip uploading individual pages to Azure Blob Storage")
     parser.add_argument("--storageaccount", help="Azure Blob Storage account name")
@@ -340,6 +348,7 @@ if __name__ == "__main__":
     parser.add_argument("--formrecognizerservice", required=False, help="Optional. Name of the Azure Form Recognizer service which will be used to extract text, tables and layout from the documents (must exist already)")
     parser.add_argument("--formrecognizerkey", required=False, help="Optional. Use this Azure Form Recognizer account key instead of the current user identity to login (use az login to set current user for Azure)")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
+    parser.add_argument("--bloburl", required=False, help="Optional. Process this blob URL instead of a local file")
     args = parser.parse_args()
 
     # Use the current user identity to connect to Azure services unless a key is explicitly set for any of them
@@ -374,6 +383,15 @@ if __name__ == "__main__":
     if args.removeall:
         remove_blobs(None)
         remove_from_index(None)
+    elif args.bloburl:
+        filename = os.path.basename(args.bloburl)
+        if args.verbose: print(f"Downloading blob '{args.bloburl}' to '{filename}'")
+        blob_service = BlobServiceClient(account_url=f"https://{args.storageaccount}.blob.core.windows.net", credential=storage_creds)
+        blob_container = blob_service.get_container_client(args.container)
+        blob_client = blob_container.get_blob_client(filename)
+        with open(filename, "wb") as f:
+            f.write(blob_client.download_blob().readall())
+        process_file(filename, upload_each_page = not args.skipblobs)
     else:
         if not args.remove:
             create_search_index()
@@ -388,8 +406,4 @@ if __name__ == "__main__":
                 remove_blobs(None)
                 remove_from_index(None)
             else:
-                if not args.skipblobs:
-                    upload_blobs(filename)
-                page_map = get_document_text(filename)
-                sections = create_sections(os.path.basename(filename), page_map, use_vectors)
-                index_sections(os.path.basename(filename), sections)
+                process_file(filename, upload_each_page = not args.skipblobs)
