@@ -49,3 +49,6 @@ az role assignment create --role "Cognitive Services User" --assignee `az contai
 az role assignment create --role "Search Index Data Contributor" --assignee `az containerapp job show -n job-prepdocs -g $AZURE_RESOURCE_GROUP -o tsv --query identity.principalId` --resource-group $AZURE_RESOURCE_GROUP
 az role assignment create --role "Search Service Contributor" --assignee `az containerapp job show -n job-prepdocs -g $AZURE_RESOURCE_GROUP -o tsv --query identity.principalId` --resource-group $AZURE_RESOURCE_GROUP
 az role assignment create --role "Storage Blob Data Contributor" --assignee `az containerapp job show -n job-prepdocs -g $AZURE_RESOURCE_GROUP -o tsv --query identity.principalId` --resource-group $AZURE_RESOURCE_GROUP
+
+sudo curl -L https://hey-release.s3.us-east-2.amazonaws.com/hey_linux_amd64 -o /usr/local/bin/hey
+sudo chmod +x /usr/local/bin/hey
